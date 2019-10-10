@@ -7,8 +7,11 @@
 
 #pragma once
 
+#include <memory.h>
 #include "common.h"
 #include "memory.hpp"
+
+
 
 class CPU {
 public:
@@ -16,6 +19,11 @@ public:
     CPU()  {
         mem = new Memory();
         PC = 0x100;
+        SP = 0x0;
+        AF = 0;
+        BC = 0;
+        DE = 0;
+        HL = 0;
     }
 
     Memory* mem;
@@ -25,14 +33,14 @@ public:
     union {
         struct {
             union { // F is the Flags-Register; give single bits their flag-name via union
-                u8 F = 0;
+                u8 F;
                 struct {
-                    u8 reserved : 4;
-                    bool c_flag : 1;
-                    bool h_flag : 1;
-                    bool n_flag : 1;
-                    bool z_flag : 1;
-                };
+                    bool c : 1;
+                    bool h : 1;
+                    bool n : 1;
+                    bool z : 1;
+                    private: u8 reserved : 4;
+               } flags;
             };
             u8 A = 0;
         };
@@ -41,31 +49,31 @@ public:
 
     union {
         struct {
-            u8 C = 0;
-            u8 B = 0;
+            u8 C;
+            u8 B;
         };
         u16 BC;
     };
 
     union {
         struct {
-            u8 E = 0;
-            u8 D = 0;
+            u8 E;
+            u8 D;
         };
         u16 DE;
     };
 
     union {
         struct {
-            u8 L = 0;
-            u8 H = 0;
+            u8 L;
+            u8 H;
         };
         u16 HL;
     };
 
 
-    u16 SP = 0;
-    u16 PC = 0;
+    u16 SP;
+    u16 PC;
 
 
     /****************
@@ -216,7 +224,7 @@ private:
     }
 
     inline func inc(u8* reg) -> void {
-        n_flag = false;
+        flags.n = false;
         (*reg)++;
     }
 
@@ -226,7 +234,7 @@ private:
     }
 
     inline func dec(u8* reg) -> void {
-        n_flag = true;
+        flags.n = true;
         (*reg)--;
     }
 
@@ -248,21 +256,21 @@ private:
     }
 
     inline func sub(u8* reg, u8 val) -> void {
-        n_flag = true;
+        flags.c = true;
         *reg -= val;
     }
 
     inline func sub(u16* reg, u8 val) -> void {
-        n_flag = true;
+        flags.n = true;
         *reg -= val;
     }
 
     inline func add(u8* reg, u8 val) -> void {
-        n_flag = false;
+        flags.n = false;
         *reg += val;
     }
     inline func add(u16* reg, u8 val) -> void {
-        n_flag = false;
+        flags.n = false;
         *reg += val;
     }
 };

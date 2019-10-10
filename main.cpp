@@ -6,5 +6,6 @@ func main() -> int {
 
     CPU* cpu = new CPU();
     cpu->nop();
+
     return 0;
 }
