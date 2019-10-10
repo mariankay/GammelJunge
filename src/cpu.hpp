@@ -18,8 +18,8 @@ public:
 
     CPU()  {
         mem = new Memory();
-        PC = 0x100;
-        SP = 0x0;
+        PC = 0x100;  // "On power up, the GameBoy Program Counter isinitialized to $100 (100 hex)[...] p. 63
+        SP = 0xFFFE; // "The GameBoy stack pointer is initialized to $FFFE onpower up[...]" p. 64
         AF = 0;
         BC = 0;
         DE = 0;
@@ -193,8 +193,35 @@ public:
 
     func ld_sp_hl() -> void { SP = HL; } // 0xF9
 
-    func ldhl_sp_n() -> void { HL = SP + read_pc(); } // 0xF8 // TODO: Continue here
-    // set_flag(FLAG_HALF_CARRY, (((target & 0xF) - (value & 0xF)) < 0));
+    func ldhl_sp_n() -> void { // 0xF8
+        u8 n = read_pc();
+        u32 result = SP + n;
+        flags.z = false;
+        flags.n = false;
+        flags.c = 0x100 == ((SP ^ n ^ result) & 0x100u);
+        flags.h = 0x10 == ((SP ^ n ^ result) & 0x10u);
+    }
+
+    func ld_nn_sp() -> void { write16(read16_pc(), SP); } // 0x08
+
+    func push_af() -> void { write16_sp(AF); } // 0xF5
+    func push_bc() -> void { write16_sp(BC); } // 0xC5
+    func push_de() -> void { write16_sp(DE); } // 0xD5
+    func push_hl() -> void { write16_sp(HL); } // 0xE5
+
+    func pop_af() -> void { AF = read16_sp(); } // 0xF1
+    func pop_bc() -> void { BC = read16_sp(); } // 0xC1
+    func pop_de() -> void { DE = read16_sp(); } // 0xD!
+    func pop_hl() -> void { HL = read16_sp(); } // 0xE1
+
+    
+
+
+
+
+
+
+    // 0xF8 // TODO: Continue here
 
 
 
@@ -214,13 +241,35 @@ private:
         return val;
     }
 
+    // Read Program Counter
     // TODO: is it correct order?
     inline func read16_pc() -> u16 {
-        u16 val;
-        val = read_pc() << 8u;
+        u16 val = read_pc() << 8u;
         val |= read_pc();
-
         return val;
+    }
+
+    // Read Stack
+    inline func read_sp() -> u8 {
+        SP++;
+        return *(mem->mem+SP);
+    }
+
+    inline func read16_sp() -> u16 {
+        u16 val = read_sp() << 8u;
+        val |= read_sp();
+        return val;
+    }
+
+    // Write Stack
+    inline func write_sp(u8 val) -> void {
+        *(mem->mem+SP) = val;
+        SP--;
+    }
+
+    inline func write16_sp(u16 val) -> void {
+        write_sp(val & 0xFFu);
+        write_sp(val >> 8u);
     }
 
     inline func inc(u8* reg) -> void {
@@ -252,7 +301,9 @@ private:
     }
 
     inline func write16(u16 addr, u16 val) -> void {
-        *(mem->mem+addr) = val;
+        *(mem->mem+addr)   = (val & 0xFFu);
+        *(mem->mem+addr+1) = (val >> 8u);
+
     }
 
     inline func sub(u8* reg, u8 val) -> void {
