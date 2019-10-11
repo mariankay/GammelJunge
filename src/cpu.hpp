@@ -2,7 +2,7 @@
 // Created by mrn on 06.10.19.
 //
 
-// See: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf page 61
+// See: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
 
 
 #pragma once
@@ -35,11 +35,14 @@ public:
             union { // F is the Flags-Register; give single bits their flag-name via union
                 u8 F;
                 struct {
+                private:
+                    u8 reserved : 4;
+                public:
                     bool c : 1;
                     bool h : 1;
                     bool n : 1;
                     bool z : 1;
-                    private: u8 reserved : 4;
+
                } flags;
             };
             u8 A = 0;
@@ -76,10 +79,16 @@ public:
     u16 PC;
 
 
-    /****************
-     * CPU Commands *
-     ****************/
+    /****************************************************************************
+     *                                                                          *
+     * CPU Commands are listened in Section 3.3 / Page 65 of the GBC CPU manual *
+     *                                                                          *
+     ****************************************************************************/
 
+
+    /*************************************
+     * Section 3.3.1, p. 65: 8-Bit Loads *
+     *************************************/
 
     // LD R,n
     func ld_b_n()    -> void { B = read_pc(); } // 0x06
@@ -185,6 +194,10 @@ public:
     func ldh_n_a() -> void { write(0xFF00 + read_pc(), A); } // 0xE0
     func ldh_a_n() -> void { A = read(0xFF00 + read_pc()); }     // 0xF0
 
+    /**************************************
+     * Section 3.3.2, p. 76: 16-Bit Loads *
+     **************************************/
+
     // LD RR,nn
     func ld_bc_nn()  -> void {  BC = read16_pc(); } // 0x01
     func ld_de_nn()  -> void {  DE = read16_pc(); } // 0x11
@@ -193,6 +206,9 @@ public:
 
     func ld_sp_hl() -> void { SP = HL; } // 0xF9
 
+
+    /** Surprisingly, this one Load-Command affects the flag register
+        while all other load-command don't care for the flags **/
     func ldhl_sp_n() -> void { // 0xF8
         u8 n = read_pc();
         u32 result = SP + n;
@@ -214,14 +230,120 @@ public:
     func pop_de() -> void { DE = read16_sp(); } // 0xD!
     func pop_hl() -> void { HL = read16_sp(); } // 0xE1
 
-    
+    /***********************************
+     * Section 3.3.3, p. 80: 8-Bit ALU *
+     ***********************************/
 
+    // ADD A,n
+    func add_a_a()  ->  void { A = add8bit(A, A); } // 0x87
+    func add_a_b()  ->  void { A = add8bit(A, B); } // 0x80
+    func add_a_c()  ->  void { A = add8bit(A, C); } // 0x81
+    func add_a_d()  ->  void { A = add8bit(A, D); } // 0x82
+    func add_a_e()  ->  void { A = add8bit(A, E); } // 0x83
+    func add_a_h()  ->  void { A = add8bit(A, H); } // 0x84
+    func add_a_l()  ->  void { A = add8bit(A, L); } // 0x85
+    func add_a_hl() ->  void { A = add8bit(A, read(HL)); } // 0x86
+    func add_a_n()  ->  void { A = add8bit(A, read_pc()); } // 0xC6
 
+    // ADC A,n
+    func adc_a_a()  ->  void { A = adc8bit(A, A); } // 0x8F
+    func adc_a_b()  ->  void { A = adc8bit(A, B); } // 0x88
+    func adc_a_c()  ->  void { A = adc8bit(A, C); } // 0x89
+    func adc_a_d()  ->  void { A = adc8bit(A, D); } // 0x8A
+    func adc_a_e()  ->  void { A = adc8bit(A, E); } // 0x8B
+    func adc_a_h()  ->  void { A = adc8bit(A, H); } // 0x8C
+    func adc_a_l()  ->  void { A = add8bit(A, L); } // 0x8D
+    func adc_a_hl() ->  void { A = adc8bit(A, read(HL)); } // 0x8E
+    func adc_a_n()  ->  void { A = adc8bit(A, read_pc()); } // 0xCE
 
+    // SUB A, n
+    func sub_a_a()  -> void { A = sub8bit(A, A); } // 0x97
+    func sub_a_b()  -> void { A = sub8bit(A, B); } // 0x90
+    func sub_a_c()  -> void { A = sub8bit(A, C); } // 0x91
+    func sub_a_d()  -> void { A = sub8bit(A, D); } // 0x92
+    func sub_a_e()  -> void { A = sub8bit(A, E); } // 0x93
+    func sub_a_h()  -> void { A = sub8bit(A, H); } // 0x94
+    func sub_a_l()  -> void { A = sub8bit(A, L); } // 0x95
+    func sub_a_hl() -> void { A = sub8bit(A, read(HL)); } // 0x96
+    func sub_a_n()  -> void { A = sub8bit(A, read_pc()); } // 0xD6
 
+    // SBC A, n
+    func sbc_a_a()  -> void { A = sbc8bit(A, A); } // 0x97
+    func sbc_a_b()  -> void { A = sbc8bit(A, B); } // 0x90
+    func sbc_a_c()  -> void { A = sbc8bit(A, C); } // 0x91
+    func sbc_a_d()  -> void { A = sbc8bit(A, D); } // 0x92
+    func sbc_a_e()  -> void { A = sbc8bit(A, E); } // 0x93
+    func sbc_a_h()  -> void { A = sbc8bit(A, H); } // 0x94
+    func sbc_a_l()  -> void { A = sbc8bit(A, L); } // 0x95
+    func sbc_a_hl() -> void { A = sbc8bit(A, read(HL)); } // 0x96
+    func sbc_a_n()  -> void { A = sbc8bit(A, read_pc()); } // 0xD6
 
+    // AND A, n
+    func and_a_a()  -> void { A = and8bit(A, A); } // 0xA7
+    func and_a_b()  -> void { A = and8bit(A, B); } // 0xA0
+    func and_a_c()  -> void { A = and8bit(A, C); } // 0xA1
+    func and_a_d()  -> void { A = and8bit(A, D); } // 0xA2
+    func and_a_e()  -> void { A = and8bit(A, E); } // 0xA3
+    func and_a_h()  -> void { A = and8bit(A, H); } // 0xA4
+    func and_a_l()  -> void { A = and8bit(A, L); } // 0xA5
+    func and_a_hl() -> void { A = and8bit(A, read(HL)); } // 0xA6
+    func and_a_n()  -> void { A = and8bit(A, read_pc()); } // 0xE6
 
-    // 0xF8 // TODO: Continue here
+    // OR A, n
+    func or_a_a()  -> void { A = or8bit(A, A); } // 0xB7
+    func or_a_b()  -> void { A = or8bit(A, B); } // 0xB0
+    func or_a_c()  -> void { A = or8bit(A, C); } // 0xB1
+    func or_a_d()  -> void { A = or8bit(A, D); } // 0xB2
+    func or_a_e()  -> void { A = or8bit(A, E); } // 0xB3
+    func or_a_h()  -> void { A = or8bit(A, H); } // 0xB4
+    func or_a_l()  -> void { A = or8bit(A, L); } // 0xB5
+    func or_a_hl() -> void { A = or8bit(A, read(HL)); } // 0xB6
+    func or_a_n()  -> void { A = or8bit(A, read_pc()); } // 0xF6
+
+    // XOR A, n
+    func xor_a_a()  -> void { A = xor8bit(A, A); } // 0xAF
+    func xor_a_b()  -> void { A = xor8bit(A, B); } // 0xA8
+    func xor_a_c()  -> void { A = xor8bit(A, C); } // 0xA9
+    func xor_a_d()  -> void { A = xor8bit(A, D); } // 0xAA
+    func xor_a_e()  -> void { A = xor8bit(A, E); } // 0xAB
+    func xor_a_h()  -> void { A = xor8bit(A, H); } // 0xAC
+    func xor_a_l()  -> void { A = xor8bit(A, L); } // 0xAD
+    func xor_a_hl() -> void { A = xor8bit(A, read(HL)); } // 0xAE
+    func xor_a_n()  -> void { A = xor8bit(A, read_pc()); } // 0xEE
+
+    // CP A,n
+    /* Description of CP command on p. 87:
+     * "This is basically an A - n  subtraction instruction but the results are thrown  away."
+     */
+    func cp_a_a()  -> void { (void)sub8bit(A, A); }
+    func cp_a_b()  -> void { (void)sub8bit(A, B); }
+    func cp_a_c()  -> void { (void)sub8bit(A, C); }
+    func cp_a_d()  -> void { (void)sub8bit(A, D); }
+    func cp_a_e()  -> void { (void)sub8bit(A, E); }
+    func cp_a_h()  -> void { (void)sub8bit(A, H); }
+    func cp_a_l()  -> void { (void)sub8bit(A, L); }
+    func cp_a_hl() -> void { (void)sub8bit(A, read(HL)); }
+    func cp_a_n()  -> void { (void)sub8bit(A, read_pc()); }
+
+    // INC R
+    func inc_a()  -> void { inc(&A); } // 0x3D
+    func inc_b()  -> void { inc(&B); } // 0x04
+    func inc_c()  -> void { inc(&C); } // 0x0C
+    func inc_d()  -> void { inc(&D); } // 0x14
+    func inc_e()  -> void { inc(&E); } // 0x1C
+    func inc_h()  -> void { inc(&H); } // 0x24
+    func inc_l()  -> void { inc(&L); } // 0x2C
+    func inc_hl() -> void { u8 val = read(HL); inc(&val); write(HL, val); } // 0x34
+
+    // DEC R
+    func dec_a()  -> void { dec(&A); } // 0x3D
+    func dec_b()  -> void { dec(&B); } // 0x05
+    func dec_c()  -> void { dec(&C); } // 0x0D
+    func dec_d()  -> void { dec(&D); } // 0x15
+    func dec_e()  -> void { dec(&E); } // 0x1D
+    func dec_h()  -> void { dec(&H); } // 0x25
+    func dec_l()  -> void { dec(&L); } // 0x2D
+    func dec_hl() -> void { u8 val = read(HL); dec(&val); write(HL, val); } // 0x35
 
 
 
@@ -234,28 +356,105 @@ public:
 private:
     bool _stop = false;
 
-    inline func read_pc() -> u8 {
+    [[nodiscard]] inline func add8bit(u8 op1, u8 op2) -> u8 {
+        u16 result = op1 + op2;
+        flags.c = 0x100u == ((op1 ^ op2 ^ result) & 0x100u);
+        flags.h = 0x10u == ((op1 ^ op2 ^ result) & 0x10u);
+        flags.z = result == 0;
+        flags.n = false;
+        return (u8)(result & 0xFFu);
 
+    }
+
+    [[nodiscard]] inline func adc8bit(u8 op1, u8 op2) -> u8 {
+        u16 result = op1 + op2 + flags.c;
+        flags.c = 0x100u == ((op1 ^ op2 ^ result) & 0x100u);
+        flags.h = 0x10u == ((op1 ^ op2 ^ result) & 0x10u);
+        flags.z = result == 0;
+        flags.n = false;
+        return (u8)(result & 0xFFu);
+    }
+
+    [[nodiscard]] inline func sub8bit(u8 op1, u8 op2) -> u8 {
+        flags.c = op1 < op2;
+        flags.h = (op1 & 0x0F) < (op2 & 0x0F);
+        flags.z = op1 == op2;
+        flags.n = true;
+        return (u8)(op1 - op2);
+    }
+
+    [[nodiscard]] inline func sbc8bit(u8 op1, u8 op2) -> u8 {
+        op2 = op2 + flags.c;
+        flags.c = op1 < op2;
+        flags.h = (op1 & 0x0F) < (op2 & 0x0F);
+        flags.z = op1 == op2;
+        flags.n = true;
+        return (u8)(op1 - op2);
+    }
+
+    [[nodiscard]] inline func and8bit(u8 op1, u8 op2) -> u8 {
+        u8 result = op1 & op2;
+        flags.z = result == 0;
+        flags.n = false;
+        flags.h = true;
+        flags.c = false;
+        return result;
+    };
+
+    [[nodiscard]] inline func or8bit(u8 op1, u8 op2) -> u8 {
+        u8 result = op1 | op2;
+        flags.z = result == 0;
+        flags.n = false;
+        flags.h = false;
+        flags.c = false;
+        return result;
+    }
+
+    [[nodiscard]] inline func xor8bit(u8 op1, u8 op2) -> u8 {
+        u8 result = op1 ^ op2;
+        flags.z = op1 == 0;
+        flags.n = false;
+        flags.h = false;
+        flags.c = false;
+        return result;
+    }
+
+    inline func inc(u8* addr) -> void {
+        flags.z = 0xFF == *addr;
+        flags.n = false;
+        flags.h = 0x0F == (*addr & 0x0Fu);
+        (*addr)++;
+    }
+
+    inline func dec(u8* addr) -> void {
+        (*addr)--;
+        flags.z = 0 == *addr;
+        flags.n = true;
+        flags.h = (*addr & 0x0Fu) == 0x0F;
+    }
+
+
+    // Read Program Counter
+    [[nodiscard]] inline func read_pc() -> u8 {
         u8 val =  *(mem->mem+PC);
         PC++;
         return val;
     }
 
-    // Read Program Counter
-    // TODO: is it correct order?
-    inline func read16_pc() -> u16 {
-        u16 val = read_pc() << 8u;
-        val |= read_pc();
+
+    [[nodiscard]] inline func read16_pc() -> u16 {
+        u16 val = read_pc();
+        val |= (u8)(read_pc() << 8u);
         return val;
     }
 
     // Read Stack
-    inline func read_sp() -> u8 {
+    [[nodiscard]] inline func read_sp() -> u8 {
         SP++;
         return *(mem->mem+SP);
     }
 
-    inline func read16_sp() -> u16 {
+    [[nodiscard]] inline func read16_sp() -> u16 {
         u16 val = read_sp() << 8u;
         val |= read_sp();
         return val;
@@ -272,26 +471,6 @@ private:
         write_sp(val >> 8u);
     }
 
-    inline func inc(u8* reg) -> void {
-        flags.n = false;
-        (*reg)++;
-    }
-
-    inline func inc(u16* reg) -> void {
-
-        (*reg)++;
-    }
-
-    inline func dec(u8* reg) -> void {
-        flags.n = true;
-        (*reg)--;
-    }
-
-    inline func dec(u16* reg) -> void {
-        (*reg)--;
-    }
-
-
     inline func read(u16 addr) -> u8 {
         return (*(mem->mem)+addr);
     }
@@ -304,24 +483,5 @@ private:
         *(mem->mem+addr)   = (val & 0xFFu);
         *(mem->mem+addr+1) = (val >> 8u);
 
-    }
-
-    inline func sub(u8* reg, u8 val) -> void {
-        flags.c = true;
-        *reg -= val;
-    }
-
-    inline func sub(u16* reg, u8 val) -> void {
-        flags.n = true;
-        *reg -= val;
-    }
-
-    inline func add(u8* reg, u8 val) -> void {
-        flags.n = false;
-        *reg += val;
-    }
-    inline func add(u16* reg, u8 val) -> void {
-        flags.n = false;
-        *reg += val;
     }
 };
