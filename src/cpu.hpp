@@ -216,6 +216,7 @@ public:
         flags.n = false;
         flags.c = 0x100 == ((SP ^ n ^ result) & 0x100u);
         flags.h = 0x10 == ((SP ^ n ^ result) & 0x10u);
+        HL = result;
     }
 
     func ld_nn_sp() -> void { write16(read16_pc(), SP); } // 0x08
@@ -242,7 +243,7 @@ public:
     func add_a_e()  ->  void { A = add8bit(A, E); } // 0x83
     func add_a_h()  ->  void { A = add8bit(A, H); } // 0x84
     func add_a_l()  ->  void { A = add8bit(A, L); } // 0x85
-    func add_a_hl() ->  void { A = add8bit(A, read(HL)); } // 0x86
+    func add_a_hl_ref() ->  void { A = add8bit(A, read(HL)); } // 0x86
     func add_a_n()  ->  void { A = add8bit(A, read_pc()); } // 0xC6
 
     // ADC A,n
@@ -253,7 +254,7 @@ public:
     func adc_a_e()  ->  void { A = adc8bit(A, E); } // 0x8B
     func adc_a_h()  ->  void { A = adc8bit(A, H); } // 0x8C
     func adc_a_l()  ->  void { A = add8bit(A, L); } // 0x8D
-    func adc_a_hl() ->  void { A = adc8bit(A, read(HL)); } // 0x8E
+    func adc_a_hl_ref() ->  void { A = adc8bit(A, read(HL)); } // 0x8E
     func adc_a_n()  ->  void { A = adc8bit(A, read_pc()); } // 0xCE
 
     // SUB A, n
@@ -264,7 +265,7 @@ public:
     func sub_a_e()  -> void { A = sub8bit(A, E); } // 0x93
     func sub_a_h()  -> void { A = sub8bit(A, H); } // 0x94
     func sub_a_l()  -> void { A = sub8bit(A, L); } // 0x95
-    func sub_a_hl() -> void { A = sub8bit(A, read(HL)); } // 0x96
+    func sub_a_hl_ref() -> void { A = sub8bit(A, read(HL)); } // 0x96
     func sub_a_n()  -> void { A = sub8bit(A, read_pc()); } // 0xD6
 
     // SBC A, n
@@ -275,7 +276,7 @@ public:
     func sbc_a_e()  -> void { A = sbc8bit(A, E); } // 0x93
     func sbc_a_h()  -> void { A = sbc8bit(A, H); } // 0x94
     func sbc_a_l()  -> void { A = sbc8bit(A, L); } // 0x95
-    func sbc_a_hl() -> void { A = sbc8bit(A, read(HL)); } // 0x96
+    func sbc_a_hl_ref() -> void { A = sbc8bit(A, read(HL)); } // 0x96
     func sbc_a_n()  -> void { A = sbc8bit(A, read_pc()); } // 0xD6
 
     // AND A, n
@@ -286,7 +287,7 @@ public:
     func and_a_e()  -> void { A = and8bit(A, E); } // 0xA3
     func and_a_h()  -> void { A = and8bit(A, H); } // 0xA4
     func and_a_l()  -> void { A = and8bit(A, L); } // 0xA5
-    func and_a_hl() -> void { A = and8bit(A, read(HL)); } // 0xA6
+    func and_a_hl_ref() -> void { A = and8bit(A, read(HL)); } // 0xA6
     func and_a_n()  -> void { A = and8bit(A, read_pc()); } // 0xE6
 
     // OR A, n
@@ -297,7 +298,7 @@ public:
     func or_a_e()  -> void { A = or8bit(A, E); } // 0xB3
     func or_a_h()  -> void { A = or8bit(A, H); } // 0xB4
     func or_a_l()  -> void { A = or8bit(A, L); } // 0xB5
-    func or_a_hl() -> void { A = or8bit(A, read(HL)); } // 0xB6
+    func or_a_hl_ref() -> void { A = or8bit(A, read(HL)); } // 0xB6
     func or_a_n()  -> void { A = or8bit(A, read_pc()); } // 0xF6
 
     // XOR A, n
@@ -308,7 +309,7 @@ public:
     func xor_a_e()  -> void { A = xor8bit(A, E); } // 0xAB
     func xor_a_h()  -> void { A = xor8bit(A, H); } // 0xAC
     func xor_a_l()  -> void { A = xor8bit(A, L); } // 0xAD
-    func xor_a_hl() -> void { A = xor8bit(A, read(HL)); } // 0xAE
+    func xor_a_hl_ref() -> void { A = xor8bit(A, read(HL)); } // 0xAE
     func xor_a_n()  -> void { A = xor8bit(A, read_pc()); } // 0xEE
 
     // CP A,n
@@ -322,7 +323,7 @@ public:
     func cp_a_e()  -> void { (void)sub8bit(A, E); }
     func cp_a_h()  -> void { (void)sub8bit(A, H); }
     func cp_a_l()  -> void { (void)sub8bit(A, L); }
-    func cp_a_hl() -> void { (void)sub8bit(A, read(HL)); }
+    func cp_a_hl_ref() -> void { (void)sub8bit(A, read(HL)); }
     func cp_a_n()  -> void { (void)sub8bit(A, read_pc()); }
 
     // INC R
@@ -333,7 +334,7 @@ public:
     func inc_e()  -> void { inc(&E); } // 0x1C
     func inc_h()  -> void { inc(&H); } // 0x24
     func inc_l()  -> void { inc(&L); } // 0x2C
-    func inc_hl() -> void { u8 val = read(HL); inc(&val); write(HL, val); } // 0x34
+    func inc_hl_ref() -> void { u8 val = read(HL); inc(&val); write(HL, val); } // 0x34
 
     // DEC R
     func dec_a()  -> void { dec(&A); } // 0x3D
@@ -343,7 +344,41 @@ public:
     func dec_e()  -> void { dec(&E); } // 0x1D
     func dec_h()  -> void { dec(&H); } // 0x25
     func dec_l()  -> void { dec(&L); } // 0x2D
-    func dec_hl() -> void { u8 val = read(HL); dec(&val); write(HL, val); } // 0x35
+    func dec_hl_ref() -> void { u8 val = read(HL); dec(&val); write(HL, val); } // 0x35
+
+
+    /************************************
+     * Section 3.3.4, p. 90: 16-Bit ALU *
+     ************************************/
+
+    // ADD HL,RR
+    func add_hl_bc() -> void { HL = add16bit(HL, BC); } // 0x09
+    func add_hl_de() -> void { HL = add16bit(HL, DE); } // 0x19
+    func add_hl_hl() -> void { HL = add16bit(HL, HL); } // 0x29
+    func add_hl_sp() -> void { HL = add16bit(HL, SP); } // 0x39
+
+    // ADD SP,n
+    func add_sp_n() -> void { // 0xE8
+        u8 n = read_pc();
+        u32 result = SP + n;
+        flags.z = false;
+        flags.n = false;
+        flags.c = 0x100u == ((SP ^ n ^ result) & 0x100u);
+        flags.h = 0x10u == ((SP ^ n ^ result) & 0x10u);
+        SP = result;
+    }
+
+    // INC RR
+    func inc_bc() -> void { BC++; } // 0x03
+    func inc_de() -> void { DE++; } // 0x13
+    func inc_hl() -> void { HL++; } // 0x23
+    func inc_sp() -> void { SP++; } // 0x33
+
+    // DEC RR
+    func dec_bc() -> void { BC--; } // 0x0B
+    func dec_de() -> void { DE--; } // 0x1B
+    func dec_hl() -> void { HL--; } // 0x2B
+    func dec_sp() -> void { SP--; } // 0x3B
 
 
 
@@ -373,6 +408,15 @@ private:
         flags.z = result == 0;
         flags.n = false;
         return (u8)(result & 0xFFu);
+    }
+
+    [[nodiscard]] inline func add16bit(u16 op1, u16 op2) -> u16 {
+        u32 result = op1 + op2;
+        flags.n = false;
+        flags.c = 0x1'00'00u == ((op1 ^ op2 ^ result) & 0x1'00'00u);
+        flags.h = 0x10'00 == ((op1 ^ op2 ^ result) & 0x10'00);
+        return (u16)result;
+
     }
 
     [[nodiscard]] inline func sub8bit(u8 op1, u8 op2) -> u8 {
