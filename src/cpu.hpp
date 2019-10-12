@@ -203,7 +203,6 @@ public:
     func ld_de_nn()  -> void {  DE = read16_pc(); } // 0x11
     func ld_hl_nn()  -> void {  HL = read16_pc(); } // 0x21
     func ld_sp_nn()  -> void {  SP = read16_pc(); } // 0x31
-
     func ld_sp_hl() -> void { SP = HL; } // 0xF9
 
 
@@ -214,8 +213,8 @@ public:
         u32 result = SP + n;
         flags.z = false;
         flags.n = false;
-        flags.c = 0x100 == ((SP ^ n ^ result) & 0x100u);
-        flags.h = 0x10 == ((SP ^ n ^ result) & 0x10u);
+        flags.c = 0x100 == ((SP ^ n ^ result) & 0x100);
+        flags.h = 0x10 == ((SP ^ n ^ result) & 0x10);
         HL = result;
     }
 
@@ -363,8 +362,8 @@ public:
         u32 result = SP + n;
         flags.z = false;
         flags.n = false;
-        flags.c = 0x100u == ((SP ^ n ^ result) & 0x100u);
-        flags.h = 0x10u == ((SP ^ n ^ result) & 0x10u);
+        flags.c = 0x100 == ((SP ^ n ^ result) & 0x100);
+        flags.h = 0x10 == ((SP ^ n ^ result) & 0x10);
         SP = result;
     }
 
@@ -380,40 +379,136 @@ public:
     func dec_hl() -> void { HL--; } // 0x2B
     func dec_sp() -> void { SP--; } // 0x3B
 
+    /***************************************
+     * Section 3.3.5, p. 94: Miscellaneous *
+     ***************************************/
+
+    func swap_a() -> void { A = swap(A); } // 0xCB 37
+    func swap_b() -> void { B = swap(B); } // 0xCB 30
+    func swap_c() -> void { C = swap(C); } // 0xCB 31
+    func swap_d() -> void { D = swap(D); } // 0xCB 32
+    func swap_e() -> void { E = swap(E); } // 0xCB 33
+    func swap_h() -> void { H = swap(H); } // 0xCB 34
+    func swap_l() -> void { L = swap(L); } // 0xCB 35
+    func swap_hl_ref() -> void { u8 val = read(HL); A = swap(val); write(HL, val); } // 0xCB 36
 
 
-    func nop()       -> void { } // 0x00
-    func daa() {  printf("Error: Command DAA not implemented. Stopping. "); _stop = true;}
-    func stop() { _stop = true; }
+
+    func daa() -> void {  // 0x27
+        u16 correction = 0;
+        if (flags.h || (!flags.n && ((A & 0x0F) > 0x09)))
+            correction |= 0x06;
+        if (flags.h || (!flags.n && ((A & 0xFF) > 0x99)))
+            correction |= 0x60;
+
+        A += flags.n ? -correction : +correction;
+
+        flags.c = A > 0x99;
+        flags.z = A == 0;
+        flags.h = false;
+    }
+
+
+    func cpl() -> void { A = ~A; } // 0x2F
+    func ccf() -> void { flags.c = ! flags.c; } // 0x3F
+    func scf() -> void {F |= 001'0000; } // 0x37
+    func nop() -> void { } // 0x00
+    func halt() -> void { _halt = true; } // 0x76
+    func stop() -> void { _stop = true; } // 0x10 00
+    func di() -> void { interruptable = false; } // 0xF3
+    func ei() -> void { interruptable = true; } // 0xFB
+
 
 
 
 private:
     bool _stop = false;
+    bool _halt = false;
+    bool interruptable = true;
+
+    /************************************************
+     * Helper Functions for Read/Write Instructions *
+     ************************************************/
+
+    // Read Program Counter
+    [[nodiscard]] inline func read_pc() -> u8 {
+        u8 val =  *(mem->mem+PC);
+        PC++;
+        return val;
+    }
+
+
+    [[nodiscard]] inline func read16_pc() -> u16 {
+        u16 val = read_pc();
+        val |= read_pc() << 8;
+        return val;
+    }
+
+    // Read Stack
+    [[nodiscard]] inline func read_sp() -> u8 {
+        SP++;
+        return *(mem->mem+SP);
+    }
+
+    [[nodiscard]] inline func read16_sp() -> u16 {
+        u16 val = read_sp() << 8;
+        val |= read_sp();
+        return val;
+    }
+
+    // Write Stack
+    inline func write_sp(u8 val) -> void {
+        *(mem->mem+SP) = val;
+        SP--;
+    }
+
+    inline func write16_sp(u16 val) -> void {
+        write_sp(val & 0xFF);
+        write_sp(val >> 8);
+    }
+
+    inline func read(u16 addr) -> u8 {
+        return (*(mem->mem)+addr);
+    }
+
+    inline func write(i16 addr, u8 val) -> void {
+        *(mem->mem+addr) = val;
+    }
+
+    inline func write16(u16 addr, u16 val) -> void {
+        *(mem->mem+addr)   = (val & 0xFF);
+        *(mem->mem+addr+1) = (val >> 8);
+
+    }
+
+
+    /************************************************
+     * Helper Functions for Arithmetic Instructions *
+     ************************************************/
 
     [[nodiscard]] inline func add8bit(u8 op1, u8 op2) -> u8 {
         u16 result = op1 + op2;
-        flags.c = 0x100u == ((op1 ^ op2 ^ result) & 0x100u);
-        flags.h = 0x10u == ((op1 ^ op2 ^ result) & 0x10u);
+        flags.c = 0x100 == ((op1 ^ op2 ^ result) & 0x100);
+        flags.h = 0x10 == ((op1 ^ op2 ^ result) & 0x10);
         flags.z = result == 0;
         flags.n = false;
-        return (u8)(result & 0xFFu);
+        return (u8)(result & 0xFF);
 
     }
 
     [[nodiscard]] inline func adc8bit(u8 op1, u8 op2) -> u8 {
         u16 result = op1 + op2 + flags.c;
-        flags.c = 0x100u == ((op1 ^ op2 ^ result) & 0x100u);
-        flags.h = 0x10u == ((op1 ^ op2 ^ result) & 0x10u);
+        flags.c = 0x100 == ((op1 ^ op2 ^ result) & 0x100);
+        flags.h = 0x10 == ((op1 ^ op2 ^ result) & 0x10);
         flags.z = result == 0;
         flags.n = false;
-        return (u8)(result & 0xFFu);
+        return (u8)(result & 0xFF);
     }
 
     [[nodiscard]] inline func add16bit(u16 op1, u16 op2) -> u16 {
         u32 result = op1 + op2;
         flags.n = false;
-        flags.c = 0x1'00'00u == ((op1 ^ op2 ^ result) & 0x1'00'00u);
+        flags.c = 0x1'00'00 == ((op1 ^ op2 ^ result) & 0x1'00'00);
         flags.h = 0x10'00 == ((op1 ^ op2 ^ result) & 0x10'00);
         return (u16)result;
 
@@ -466,7 +561,7 @@ private:
     inline func inc(u8* addr) -> void {
         flags.z = 0xFF == *addr;
         flags.n = false;
-        flags.h = 0x0F == (*addr & 0x0Fu);
+        flags.h = 0x0F == (*addr & 0x0F);
         (*addr)++;
     }
 
@@ -474,58 +569,25 @@ private:
         (*addr)--;
         flags.z = 0 == *addr;
         flags.n = true;
-        flags.h = (*addr & 0x0Fu) == 0x0F;
+        flags.h = (*addr & 0x0F) == 0x0F;
     }
 
+    /***************************************************
+     * Helper Functions for Miscellaneous Instructions *
+     ***************************************************/
 
-    // Read Program Counter
-    [[nodiscard]] inline func read_pc() -> u8 {
-        u8 val =  *(mem->mem+PC);
-        PC++;
+    inline func swap(u8 val) -> u8 {
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+        flags.c = false;
+
+        u8 tmp = val & 0x0F;
+        val = val >> 4;
+        val = val | (tmp << 4);
         return val;
     }
 
 
-    [[nodiscard]] inline func read16_pc() -> u16 {
-        u16 val = read_pc();
-        val |= (u8)(read_pc() << 8u);
-        return val;
-    }
 
-    // Read Stack
-    [[nodiscard]] inline func read_sp() -> u8 {
-        SP++;
-        return *(mem->mem+SP);
-    }
-
-    [[nodiscard]] inline func read16_sp() -> u16 {
-        u16 val = read_sp() << 8u;
-        val |= read_sp();
-        return val;
-    }
-
-    // Write Stack
-    inline func write_sp(u8 val) -> void {
-        *(mem->mem+SP) = val;
-        SP--;
-    }
-
-    inline func write16_sp(u16 val) -> void {
-        write_sp(val & 0xFFu);
-        write_sp(val >> 8u);
-    }
-
-    inline func read(u16 addr) -> u8 {
-        return (*(mem->mem)+addr);
-    }
-
-    inline func write(i16 addr, u8 val) -> void {
-        *(mem->mem+addr) = val;
-    }
-
-    inline func write16(u16 addr, u16 val) -> void {
-        *(mem->mem+addr)   = (val & 0xFFu);
-        *(mem->mem+addr+1) = (val >> 8u);
-
-    }
 };
