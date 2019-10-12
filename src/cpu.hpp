@@ -220,15 +220,15 @@ public:
 
     func ld_nn_sp() -> void { write16(read16_pc(), SP); } // 0x08
 
-    func push_af() -> void { write16_sp(AF); } // 0xF5
-    func push_bc() -> void { write16_sp(BC); } // 0xC5
-    func push_de() -> void { write16_sp(DE); } // 0xD5
-    func push_hl() -> void { write16_sp(HL); } // 0xE5
+    func push_af() -> void { push16(AF); } // 0xF5
+    func push_bc() -> void { push16(BC); } // 0xC5
+    func push_de() -> void { push16(DE); } // 0xD5
+    func push_hl() -> void { push16(HL); } // 0xE5
 
-    func pop_af() -> void { AF = read16_sp(); } // 0xF1
-    func pop_bc() -> void { BC = read16_sp(); } // 0xC1
-    func pop_de() -> void { DE = read16_sp(); } // 0xD!
-    func pop_hl() -> void { HL = read16_sp(); } // 0xE1
+    func pop_af() -> void { AF = pop16(); } // 0xF1
+    func pop_bc() -> void { BC = pop16(); } // 0xC1
+    func pop_de() -> void { DE = pop16(); } // 0xD!
+    func pop_hl() -> void { HL = pop16(); } // 0xE1
 
     /***********************************
      * Section 3.3.3, p. 80: 8-Bit ALU *
@@ -568,26 +568,65 @@ public:
     func res_hl_ref() -> void { u8 bit_val = read_pc(); u8 val = res(bit_val, read(HL)); write(HL, val); } // 0xCB 86
 
     /********************************
-     * Section 3.3.7, p. 108: Jumps *
+     * Section 3.3.8, p. 108: Jumps *
      ********************************/
 
     func jp_nn() -> void { PC = read16_pc(); } // 0xC3
 
     // JP cc,nn
-    func jp_nz_nn() -> void { if(!flags.z) PC = read16_pc(); } // 0xC2
-    func jp_z_nn() -> void { if(flags.z) PC = read16_pc(); }   // 0xCA
-    func jp_nc_nn() -> void { if(!flags.c) PC = read16_pc(); } // 0xD2
-    func jp_c_nn() -> void { if(flags.c) PC = read16_pc(); }   // 0xDA
+    func jp_nz_nn() -> void { if(!flags.z) jp_nn(); } // 0xC2
+    func jp_z_nn() -> void { if(flags.z) jp_nn(); }   // 0xCA
+    func jp_nc_nn() -> void { if(!flags.c) jp_nn(); } // 0xD2
+    func jp_c_nn() -> void { if(flags.c) jp_nn(); }   // 0xDA
 
     func jp_hl() -> void { PC = HL; } // 0xE9
 
     func jr_n() -> void { PC += (i8)read_pc(); } // 0x18 // TODO: PC gets incremented here because of reading. Maybe decrement is needed
 
     // JR CC,n
-    func jr_nz_n() -> void {  if(!flags.z) PC += (i8)read_pc(); } // 0x20
-    func jr_z_n() -> void {  if(flags.z) PC += (i8)read_pc(); }   // 0x28
-    func jr_nc_n() -> void {  if(!flags.c) PC += (i8)read_pc(); } // 0x30
-    func jr_c_n() -> void {  if(flags.c) PC += (i8)read_pc(); }   // 0x38
+    func jr_nz_n() -> void {  if(!flags.z) jr_n(); } // 0x20
+    func jr_z_n() -> void {  if(flags.z) jr_n() ; }   // 0x28
+    func jr_nc_n() -> void {  if(!flags.c) jr_n(); } // 0x30
+    func jr_c_n() -> void {  if(flags.c) jr_n(); }   // 0x38
+
+    /********************************
+     * Section 3.3.9, p. 108: Calls *
+     ********************************/
+
+    func call_nn() -> void { push16(PC + 1); jp_nn(); } // 0xCD
+
+    // CALL cc,nn
+    func call_nz_nn() -> void { if(!flags.z) call_nn();  } // 0xC4
+    func call_z_nn() -> void { if(flags.z) call_nn();  }   // 0xCC
+    func call_nc_nn() -> void { if(!flags.c) call_nn();  } // 0xD4
+    func call_c_nn() -> void { if(flags.c) call_nn();  }   // 0xDC
+
+    /************************************
+     * Section 3.3.10, p. 108: Restarts *
+     ************************************/
+
+    // RST, n
+    func rst_00() -> void { push(PC); PC = 0x00; } // 0xC7
+    func rst_08() -> void { push(PC); PC = 0x08; } // 0xCF
+    func rst_10() -> void { push(PC); PC = 0x10; } // 0xD7
+    func rst_18() -> void { push(PC); PC = 0x18; } // 0xDF
+    func rst_20() -> void { push(PC); PC = 0x20; } // 0xE7
+    func rst_28() -> void { push(PC); PC = 0x28; } // 0xEF
+    func rst_30() -> void { push(PC); PC = 0x30; } // 0xF7
+    func rst_38() -> void { push(PC); PC = 0x38; } // 0xFF
+
+    /************************************
+     * Section 3.3.11, p. 108: Returns  *
+     ************************************/
+
+    func ret() -> void { PC = pop16(); } // 0xC9
+
+    func ret_nz() -> void { if(!flags.z) ret(); } // 0xC0
+    func ret_z() -> void { if(flags.z) ret(); }   // 0xC8
+    func ret_nc() -> void { if(!flags.c) ret(); } // 0xD0
+    func ret_c() -> void { if(flags.c) ret(); }   // 0xD8
+
+    func reti() -> void { ret(); interruptable = true; } // 0xD9
 
 private:
     bool _stop = false;
@@ -613,28 +652,28 @@ private:
     }
 
     // Read Stack, 8-bit
-    [[nodiscard]] inline func read_sp() -> u8 {
+    [[nodiscard]] inline func pop() -> u8 {
         SP++;
         return *(mem->mem+SP);
     }
 
     // Read Stack, 16-bit
-    [[nodiscard]] inline func read16_sp() -> u16 {
-        u16 val = read_sp() << 8;
-        val |= read_sp();
+    [[nodiscard]] inline func pop16() -> u16 {
+        u16 val = pop() << 8;
+        val |= pop();
         return val;
     }
 
     // Write Stack, 8-bit
-    inline func write_sp(u8 val) -> void {
+    inline func push(u8 val) -> void {
         *(mem->mem+SP) = val;
         SP--;
     }
 
     // Write Stack, 16-bit
-    inline func write16_sp(u16 val) -> void {
-        write_sp(val & 0xFF);
-        write_sp(val >> 8);
+    inline func push16(u16 val) -> void {
+        push(val & 0xFF);
+        push(val >> 8);
     }
 
     // Read from arbitrary address, 8-bit
