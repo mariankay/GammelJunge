@@ -2,7 +2,8 @@
 // Created by mrn on 06.10.19.
 //
 
-// See: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
+// GameBoy CPU Manual: http://marc.rawer.de/Gameboy/Docs/GBCPUman.pdf
+// Citation in comments in this code refer to this manual
 
 
 #pragma once
@@ -17,20 +18,49 @@ class CPU {
 public:
 
     CPU()  {
-        mem = new Memory();
         PC = 0x100;  // "On power up, the GameBoy Program Counter isinitialized to $100 (100 hex)[...] p. 63
         SP = 0xFFFE; // "The GameBoy stack pointer is initialized to $FFFE onpower up[...]" p. 64
+
+        // initialize registers with 0
         AF = 0;
         BC = 0;
         DE = 0;
         HL = 0;
     }
+    /******************************
+     * Memory attached to the CPU *
+     ******************************/
 
-    Memory* mem;
+    Memory* mem = new Memory();
+
+
     /*************
      * Registers *
      *************/
-    union {
+
+    /**********************************************************************************
+     *  The GameBoy CPU-Registers have the following layout:                          *
+     *                                                                                *
+     *              -------------                                                     *
+     *              |  A  |  F  |                                                     *
+     *              -------------                                                     *
+     *              |  B  |  C  |                                                     *
+     *              -------------                                                     *
+     *              |  D  |  E  |                                                     *
+     *              -------------                                                     *
+     *              |  H  |  L  |                                                     *
+     *              -------------                                                     *
+     *                                                                                *
+     * Where each Register is 8-bit.                                                  *
+     * Additionally, two register pairs can be combined to a 16-bit register.         *
+     * As the layout shows, combinable registers are AF, BC, DE and HL.               *
+     * Here, this behavior is emulated by using unions.                               *
+     *                                                                                *
+     * Also note that F is the Flag-Register.                                         *
+     * To set single flag-bits in a convinient manner, another nested union is used.  *
+     *                                                                                *
+     **********************************************************************************/
+    union { // AF - Registerpair
         struct {
             union { // F is the Flags-Register; give single bits their flag-name via union
                 u8 F;
@@ -50,7 +80,7 @@ public:
             u16 AF;
     };
 
-    union {
+    union { // BC - Registerpair
         struct {
             u8 C;
             u8 B;
@@ -58,7 +88,7 @@ public:
         u16 BC;
     };
 
-    union {
+    union { // DE - Registerpair
         struct {
             u8 E;
             u8 D;
@@ -66,7 +96,7 @@ public:
         u16 DE;
     };
 
-    union {
+    union { // HL - Registerpair
         struct {
             u8 L;
             u8 H;
@@ -75,8 +105,8 @@ public:
     };
 
 
-    u16 SP;
-    u16 PC;
+    u16 SP; // stack pointer
+    u16 PC; // program counter
 
 
     /********************************************************************************
