@@ -567,6 +567,28 @@ public:
     func res_l() -> void { u8 bit_val = read_pc(); L = res(bit_val, L); } // 0xCB 85
     func res_hl_ref() -> void { u8 bit_val = read_pc(); u8 val = res(bit_val, read(HL)); write(HL, val); } // 0xCB 86
 
+    /********************************
+     * Section 3.3.7, p. 108: Jumps *
+     ********************************/
+
+    func jp_nn() -> void { PC = read16_pc(); } // 0xC3
+
+    // JP cc,nn
+    func jp_nz_nn() -> void { if(!flags.z) PC = read16_pc(); } // 0xC2
+    func jp_z_nn() -> void { if(flags.z) PC = read16_pc(); }   // 0xCA
+    func jp_nc_nn() -> void { if(!flags.c) PC = read16_pc(); } // 0xD2
+    func jp_c_nn() -> void { if(flags.c) PC = read16_pc(); }   // 0xDA
+
+    func jp_hl() -> void { PC = HL; } // 0xE9
+
+    func jr_n() -> void { PC += (i8)read_pc(); } // 0x18 // TODO: PC gets incremented here because of reading. Maybe decrement is needed
+
+    // JR CC,n
+    func jr_nz_n() -> void {  if(!flags.z) PC += (i8)read_pc(); } // 0x20
+    func jr_z_n() -> void {  if(flags.z) PC += (i8)read_pc(); }   // 0x28
+    func jr_nc_n() -> void {  if(!flags.c) PC += (i8)read_pc(); } // 0x30
+    func jr_c_n() -> void {  if(flags.c) PC += (i8)read_pc(); }   // 0x38
+
 private:
     bool _stop = false;
     bool _halt = false;
