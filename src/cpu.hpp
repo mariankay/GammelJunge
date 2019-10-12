@@ -79,11 +79,11 @@ public:
     u16 PC;
 
 
-    /****************************************************************************
-     *                                                                          *
-     * CPU Commands are listened in Section 3.3 / Page 65 of the GBC CPU manual *
-     *                                                                          *
-     ****************************************************************************/
+    /********************************************************************************
+     *                                                                              *
+     * CPU Instructions are listened in Section 3.3 / Page 65 of the GBC CPU manual *
+     *                                                                              *
+     ********************************************************************************/
 
 
     /*************************************
@@ -533,7 +533,39 @@ public:
     func srl_l() -> void { L = srl(L); } // 0xCB 2D
     func srl_hl_ref() -> void { u8 val = srl(read(HL)); write(HL, val); } // 0xCB 2E
 
+    /**************************************
+     * Section 3.3.7, p. 108: Bit Opcodes *
+     **************************************/
 
+    // BIT (test bit)
+    func bit_a() -> void { u8 bit_val = read_pc(); bit(bit_val, A); } // 0xCB 47
+    func bit_b() -> void { u8 bit_val = read_pc(); bit(bit_val, B); } // 0xCB 40
+    func bit_c() -> void { u8 bit_val = read_pc(); bit(bit_val, C); } // 0xCB 41
+    func bit_d() -> void { u8 bit_val = read_pc(); bit(bit_val, D); } // 0xCB 42
+    func bit_e() -> void { u8 bit_val = read_pc(); bit(bit_val, E); } // 0xCB 43
+    func bit_h() -> void { u8 bit_val = read_pc(); bit(bit_val, H); } // 0xCB 44
+    func bit_l() -> void { u8 bit_val = read_pc(); bit(bit_val, L); } // 0xCB 45
+    func bit_hl_ref() -> void { u8 bit_val = read_pc(); bit(bit_val, read(HL)); } // 0xCB 46
+
+    // SET (set bit)
+    func set_a() -> void { u8 bit_val = read_pc(); A = set(bit_val, A); } // 0xCB C7
+    func set_b() -> void { u8 bit_val = read_pc(); B = set(bit_val, B); } // 0xCB C0
+    func set_c() -> void { u8 bit_val = read_pc(); C = set(bit_val, C); } // 0xCB C1
+    func set_d() -> void { u8 bit_val = read_pc(); D = set(bit_val, D); } // 0xCB C2
+    func set_e() -> void { u8 bit_val = read_pc(); E = set(bit_val, E); } // 0xCB C3
+    func set_h() -> void { u8 bit_val = read_pc(); H = set(bit_val, H); } // 0xCB C4
+    func set_l() -> void { u8 bit_val = read_pc(); L = set(bit_val, L); } // 0xCB C5
+    func set_hl_ref() -> void { u8 bit_val = read_pc(); u8 val = set(bit_val, read(HL)); write(HL, val); } // 0xCB C6
+
+    // RES (reset bit)
+    func res_a() -> void { u8 bit_val = read_pc(); A = res(bit_val, A); } // 0xCB 87
+    func res_b() -> void { u8 bit_val = read_pc(); B = res(bit_val, B); } // 0xCB 80
+    func res_c() -> void { u8 bit_val = read_pc(); C = res(bit_val, C); } // 0xCB 81
+    func res_d() -> void { u8 bit_val = read_pc(); D = res(bit_val, D); } // 0xCB 82
+    func res_e() -> void { u8 bit_val = read_pc(); E = res(bit_val, E); } // 0xCB 83
+    func res_h() -> void { u8 bit_val = read_pc(); H = res(bit_val, H); } // 0xCB 84
+    func res_l() -> void { u8 bit_val = read_pc(); L = res(bit_val, L); } // 0xCB 85
+    func res_hl_ref() -> void { u8 bit_val = read_pc(); u8 val = res(bit_val, read(HL)); write(HL, val); } // 0xCB 86
 
 private:
     bool _stop = false;
@@ -794,6 +826,23 @@ private:
         return val;
     }
 
+    /*****************************************
+     * Helper Functions for Bit Instructions *
+     *****************************************/
+
+    func bit(u8 bit, u8 reg) -> void {
+        flags.z = reg & (0x01 << bit);
+        flags.n = false;
+        flags.h = true;
+    }
+
+    [[nodiscard]] func set(u8 bit, u8 reg) -> u8 {
+        return reg | (0x01 << bit);
+    }
+
+    [[nodiscard]] func res(u8 bit, u8 reg) -> u8 {
+        return reg & ~(0x01 << bit);
+    }
 
 
 };
