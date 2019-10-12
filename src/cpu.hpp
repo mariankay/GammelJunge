@@ -411,13 +411,127 @@ public:
 
     func cpl() -> void { A = ~A; } // 0x2F
     func ccf() -> void { flags.c = ! flags.c; } // 0x3F
-    func scf() -> void {F |= 001'0000; } // 0x37
+    func scf() -> void {F |= 0b001'0000; } // 0x37
     func nop() -> void { } // 0x00
     func halt() -> void { _halt = true; } // 0x76
     func stop() -> void { _stop = true; } // 0x10 00
     func di() -> void { interruptable = false; } // 0xF3
     func ei() -> void { interruptable = true; } // 0xFB
 
+    /******************************************
+     * Section 3.3.6, p. 99: Rotates & Shifts *
+     ******************************************/
+
+    func rlca() -> void { // 0x07
+        flags.c = (A & 0x80);
+        A <<= 1;
+        A |= flags.c;
+
+        flags.z = A == 0;
+        flags.n = false;
+        flags.h = false;
+    }
+    func rla() -> void { // 0x17
+        bool carry = (A & 0x80);
+        A <<= 1;
+        A |= flags.c;
+
+        flags.c = carry;
+        flags.z = A == 0;
+        flags.n = false;
+        flags.h = false;
+    }
+
+    func rrca() -> void { // 0x0F
+        flags.c = A & 0x01;
+        A >>= 1;
+        A |= (flags.c << 7);
+
+        flags.z = A == 0;
+        flags.n = false;
+        flags.h = false;
+    }
+
+    func rra() -> void { // 0x1F
+        bool carry = (A & 0x01);
+        A >>= 1;
+        A |= (flags.c << 7);
+
+        flags.c = carry;
+        flags.z = A == 0;
+        flags.n = false;
+        flags.h = false;
+    }
+
+    // RLC n
+    func rlc_a() -> void { A = rlc(A); } // 0xCB 07
+    func rlc_b() -> void { B = rlc(B); } // 0xCB 00
+    func rlc_c() -> void { C = rlc(C); } // 0xCB 01
+    func rlc_d() -> void { D = rlc(D); } // 0xCB 02
+    func rlc_e() -> void { E = rlc(E); } // 0xCB 03
+    func rlc_h() -> void { H = rlc(H); } // 0xCB 04
+    func rlc_l() -> void { L = rlc(L); } // 0xCB 05
+    func rlc_hl_ref() -> void { u16 val = rlc(read(HL)); write(HL, val);  } // 0xCB 06
+
+    // RL n
+    func rl_a() -> void { A = rl(A); } // 0xCB 17
+    func rl_b() -> void { B = rl(B); } // 0xCB 10
+    func rl_c() -> void { C = rl(C); } // 0xCB 11
+    func rl_d() -> void { D = rl(D); } // 0xCB 12
+    func rl_e() -> void { E = rl(E); } // 0xCB 13
+    func rl_h() -> void { H = rl(H); } // 0xCB 14
+    func rl_l() -> void { L = rl(L); } // 0xCB 15
+    func rl_hl_ref() -> void { u16 val = rl(read(HL)); write(HL, val);  } // 0xCB 16
+
+    // RRC n
+    func rrc_a() -> void { A = rrc(A); } // 0xCB 0F
+    func rrc_b() -> void { B = rrc(B); } // 0xCB 08
+    func rrc_c() -> void { C = rrc(C); } // 0xCB 09
+    func rrc_d() -> void { D = rrc(D); } // 0xCB 0A
+    func rrc_e() -> void { E = rrc(E); } // 0xCB 0B
+    func rrc_h() -> void { H = rrc(H); } // 0xCB 0C
+    func rrc_l() -> void { L = rrc(L); } // 0xCB 0D
+    func rrc_hl_ref() -> void { u16 val = rrc(read(HL)); write(HL, val);  } // 0xCB 0E
+
+    // RR n
+    func rr_a() -> void { A = rr(A); } // 0xCB 1F
+    func rr_b() -> void { B = rr(B); } // 0xCB 18
+    func rr_c() -> void { C = rr(C); } // 0xCB 19
+    func rr_d() -> void { D = rr(D); } // 0xCB 1A
+    func rr_e() -> void { E = rr(E); } // 0xCB 1B
+    func rr_h() -> void { H = rr(H); } // 0xCB 1C
+    func rr_l() -> void { L = rr(L); } // 0xCB 1D
+    func rr_hl_ref() -> void { u16 val = rr(read(HL)); write(HL, val);  } // 0xCB 1E
+
+    // SLA n
+    func sla_a() -> void { A = sla(A); } // 0xCB 27
+    func sla_b() -> void { B = sla(B); } // 0xCB 20
+    func sla_c() -> void { C = sla(C); } // 0xCB 21
+    func sla_d() -> void { D = sla(D); } // 0xCB 22
+    func sla_e() -> void { E = sla(E); } // 0xCB 23
+    func sla_h() -> void { H = sla(H); } // 0xCB 24
+    func sla_l() -> void { L = sla(L); } // 0xCB 25
+    func sla_hl_ref() -> void { u8 val = sla(read(HL)); write(HL, val); } // 0xCB 26
+
+    // SRA n
+    func sra_a() -> void { A = sra(A); } // 0xCB 2F
+    func sra_b() -> void { B = sra(B); } // 0xCB 28
+    func sra_c() -> void { C = sra(C); } // 0xCB 29
+    func sra_d() -> void { D = sra(D); } // 0xCB 2A
+    func sra_e() -> void { E = sra(E); } // 0xCB 2B
+    func sra_h() -> void { H = sra(H); } // 0xCB 2C
+    func sra_l() -> void { L = sra(L); } // 0xCB 2D
+    func sra_hl_ref() -> void { u8 val = sra(read(HL)); write(HL, val); } // 0xCB 2E
+
+    // SRL n
+    func srl_a() -> void { A = srl(A); } // 0xCB 2F
+    func srl_b() -> void { B = srl(B); } // 0xCB 28
+    func srl_c() -> void { C = srl(C); } // 0xCB 29
+    func srl_d() -> void { D = srl(D); } // 0xCB 2A
+    func srl_e() -> void { E = srl(E); } // 0xCB 2B
+    func srl_h() -> void { H = srl(H); } // 0xCB 2C
+    func srl_l() -> void { L = srl(L); } // 0xCB 2D
+    func srl_hl_ref() -> void { u8 val = srl(read(HL)); write(HL, val); } // 0xCB 2E
 
 
 
@@ -430,51 +544,56 @@ private:
      * Helper Functions for Read/Write Instructions *
      ************************************************/
 
-    // Read Program Counter
+    // Read Program Counter, 8-bit
     [[nodiscard]] inline func read_pc() -> u8 {
         u8 val =  *(mem->mem+PC);
         PC++;
         return val;
     }
 
-
+    // Read Program Ccounter, 16-bit
     [[nodiscard]] inline func read16_pc() -> u16 {
         u16 val = read_pc();
         val |= read_pc() << 8;
         return val;
     }
 
-    // Read Stack
+    // Read Stack, 8-bit
     [[nodiscard]] inline func read_sp() -> u8 {
         SP++;
         return *(mem->mem+SP);
     }
 
+    // Read Stack, 16-bit
     [[nodiscard]] inline func read16_sp() -> u16 {
         u16 val = read_sp() << 8;
         val |= read_sp();
         return val;
     }
 
-    // Write Stack
+    // Write Stack, 8-bit
     inline func write_sp(u8 val) -> void {
         *(mem->mem+SP) = val;
         SP--;
     }
 
+    // Write Stack, 16-bit
     inline func write16_sp(u16 val) -> void {
         write_sp(val & 0xFF);
         write_sp(val >> 8);
     }
 
+    // Read from arbitrary address, 8-bit
     inline func read(u16 addr) -> u8 {
         return (*(mem->mem)+addr);
     }
 
+    // Write to arbitrary address, 8-bit
     inline func write(i16 addr, u8 val) -> void {
         *(mem->mem+addr) = val;
     }
 
+    // Write to arbitrary address, 16-bit
     inline func write16(u16 addr, u16 val) -> void {
         *(mem->mem+addr)   = (val & 0xFF);
         *(mem->mem+addr+1) = (val >> 8);
@@ -576,7 +695,7 @@ private:
      * Helper Functions for Miscellaneous Instructions *
      ***************************************************/
 
-    inline func swap(u8 val) -> u8 {
+    [[nodiscard]] inline func swap(u8 val) -> u8 {
         flags.z = val == 0;
         flags.n = false;
         flags.h = false;
@@ -585,6 +704,93 @@ private:
         u8 tmp = val & 0x0F;
         val = val >> 4;
         val = val | (tmp << 4);
+
+        return val;
+    }
+
+    /****************************************************
+     * Helper Functions for Rotate & Shift Instructions *
+     ****************************************************/
+
+    [[nodiscard]] inline func rlc(u8 val) -> u8 {
+        flags.c = (val & 0x80);
+        val <<= 1;
+        val |= flags.c;
+
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
+        return val;
+    }
+
+    [[nodiscard]] inline func rl(u8 val) -> u8 {
+        bool carry = (val & 0x80);
+        val <<= 1;
+        val |= flags.c;
+
+        flags.c = carry;
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
+        return val;
+    }
+
+    [[nodiscard]] inline func rrc(u8 val) -> u8 {
+        flags.c = val & 0x01;
+        val >>= 1;
+        val |= (flags.c << 7);
+
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
+        return val;
+    }
+
+    [[nodiscard]] func rr(u8 val) -> u8 { // 0x1F
+        bool carry = (val & 0x01);
+        val >>= 1;
+        val |= (flags.c << 7);
+
+        flags.c = carry;
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
+        return val;
+    }
+
+    [[nodiscard]] func sla(u8 val) -> u8 {
+        flags.c = (val & 0x80);
+        val <<= 1;
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
+        return val;
+    }
+
+    [[nodiscard]] func sra(u8 val) -> u8 {
+        u8 msb = val & 0x80;
+        flags.c = (val & 0x01);
+        val >>= 1;
+        val |= msb;
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
+        return val;
+    }
+
+    [[nodiscard]] func srl(u8 val)-> u8 {
+        flags.c = val & 0x01;
+        val >>= 1;
+        flags.z = val == 0;
+        flags.n = false;
+        flags.h = false;
+
         return val;
     }
 
