@@ -11,15 +11,21 @@
 #include <memory.h>
 #include "common.h"
 #include "memory.hpp"
+#include <map>
+
 
 
 
 class CPU {
 public:
+    typedef void (CPU::*instruction)();
+
+    std::map<u8, instruction> opcodes; // 1-Byte Opcodes
+    std::map<u8, instruction> ext_opcodes; // 2-Byte Opcodes prefixed with 0xCB
 
     CPU()  {
-        PC = 0x100;  // "On power up, the GameBoy Program Counter isinitialized to $100 (100 hex)[...] p. 63
-        SP = 0xFFFE; // "The GameBoy stack pointer is initialized to $FFFE onpower up[...]" p. 64
+        PC = 0x0;  // "On power up, the GameBoy Program Counter isinitialized to $100 (100 hex)[...] p. 63
+        SP = 0x0; // "The GameBoy stack pointer is initialized to $FFFE onpower up[...]" p. 64
 
         // initialize registers with 0
         AF = 0;
@@ -109,12 +115,30 @@ public:
     u16 PC; // program counter
 
 
+    func exec() -> u8 {
+        instruction i;
+    //    printf("opcode:");
+        u8 op = read_pc();
+        if(op == 0xCB) {
+            op = read_pc();
+            i = ext_opcodes[op];
+        } else {
+            i = opcodes[op];
+        }
+        (this->*i)();
+        //printf("\n");
+        return op;
+    }
+
     /********************************************************************************
      *                                                                              *
      * CPU Instructions are listened in Section 3.3 / Page 65 of the GBC CPU manual *
      *                                                                              *
      ********************************************************************************/
 
+    // opcode 0xCB is not directly mentionend in the manual, however it is the extension prefix-opcode,
+    // meaning that it is followed by another opcode-byte.
+    func cb() -> void {  } // 0xCB
 
     /*************************************
      * Section 3.3.1, p. 65: 8-Bit Loads *
@@ -187,7 +211,7 @@ public:
     func ld_l_h() -> void { L = H; } // 0x6C
     func ld_l_l() -> void { L = L; } // 0x6D
 
-    // LD R,(RR)
+    // LD R,(RR)ß
     func ld_a_hl() -> void { A = read(HL); } // 0x7E
     func ld_b_hl() -> void { B = read(HL); } // 0x46
     func ld_c_hl() -> void { C = read(HL); } // 0x4E
@@ -197,24 +221,26 @@ public:
     func ld_l_hl() -> void { L = read(HL); } // 0x6E
 
     // LD (RR),R
-    func lc_hl_a() -> void { write(HL, A); } // 0x77
-    func lc_hl_b() -> void { write(HL, B); } // 0x70
-    func lc_hl_c() -> void { write(HL, C); } // 0x71
-    func lc_hl_d() -> void { write(HL, D); } // 0x72
-    func lc_hl_e() -> void { write(HL, E); } // 0x73
-    func lc_hl_h() -> void { write(HL, H); } // 0x74
-    func lc_hl_l() -> void { write(HL, L); } // 0x75
+    func ld_hl_a() -> void { write(HL, A); } // 0x77
+    func ld_hl_b() -> void { write(HL, B); } // 0x70
+    func ld_hl_c() -> void { write(HL, C); } // 0x71
+    func ld_hl_d() -> void { write(HL, D); } // 0x72
+    func ld_hl_e() -> void { write(HL, E); } // 0x73
+    func ld_hl_h() -> void { write(HL, H); } // 0x74
+    func ld_hl_l() -> void { write(HL, L); } // 0x75
+    func ld_hl_n() -> void { write(HL, read_pc()); } // 0x36
 
     // LD R,(RR)
     func ld_a_bc()   -> void { A = read(BC); }          // 0x0A
     func ld_a_de()   -> void { A = read(DE); }          // 0x1A
     func ld_a_nn()   -> void { A = read(read16_pc()); } // 0xFA
+    func ld_a_n() -> void { A = read_pc(); } // 0x3E
 
     func ld_bc_a()   -> void { write(BC, A); }           // 0x02
     func ld_de_a()   -> void { write(DE, A); }           // 0x12
-    func ld_hl_a()   -> void { write(HL, A); }           // 0x77
     func ld_nn_a()   -> void { write(read16_pc(), A); }  // 0xEA
     func ldh_c_a()   -> void { write(0xFF00 + C, A); }   // 0xE2
+    func ldh_a_c()   -> void { A = read(0xFF00 + C); } // 0xF2
 
     func ld_a_hld() -> void { A = read(HL); HL--; }     // 0x3A
     func ld_hld_a() -> void { write(HL, A); HL--; } // 0x32
@@ -257,7 +283,7 @@ public:
 
     func pop_af() -> void { AF = pop16(); } // 0xF1
     func pop_bc() -> void { BC = pop16(); } // 0xC1
-    func pop_de() -> void { DE = pop16(); } // 0xD!
+    func pop_de() -> void { DE = pop16(); } // 0xD1
     func pop_hl() -> void { HL = pop16(); } // 0xE1
 
     /***********************************
@@ -298,15 +324,15 @@ public:
     func sub_a_n()  -> void { A = sub8bit(A, read_pc()); } // 0xD6
 
     // SBC A, n
-    func sbc_a_a()  -> void { A = sbc8bit(A, A); } // 0x97
-    func sbc_a_b()  -> void { A = sbc8bit(A, B); } // 0x90
-    func sbc_a_c()  -> void { A = sbc8bit(A, C); } // 0x91
-    func sbc_a_d()  -> void { A = sbc8bit(A, D); } // 0x92
-    func sbc_a_e()  -> void { A = sbc8bit(A, E); } // 0x93
-    func sbc_a_h()  -> void { A = sbc8bit(A, H); } // 0x94
-    func sbc_a_l()  -> void { A = sbc8bit(A, L); } // 0x95
-    func sbc_a_hl_ref() -> void { A = sbc8bit(A, read(HL)); } // 0x96
-    func sbc_a_n()  -> void { A = sbc8bit(A, read_pc()); } // 0xD6
+    func sbc_a_a()  -> void { A = sbc8bit(A, A); } // 0x9F
+    func sbc_a_b()  -> void { A = sbc8bit(A, B); } // 0x98
+    func sbc_a_c()  -> void { A = sbc8bit(A, C); } // 0x99
+    func sbc_a_d()  -> void { A = sbc8bit(A, D); } // 0x9A
+    func sbc_a_e()  -> void { A = sbc8bit(A, E); } // 0x9B
+    func sbc_a_h()  -> void { A = sbc8bit(A, H); } // 0x9C
+    func sbc_a_l()  -> void { A = sbc8bit(A, L); } // 0x9D
+    func sbc_a_hl_ref() -> void { A = sbc8bit(A, read(HL)); } // 0x9E
+    func sbc_a_n()  -> void { A = sbc8bit(A, read_pc()); } // 0xDE
 
     // AND A, n
     func and_a_a()  -> void { A = and8bit(A, A); } // 0xA7
@@ -345,18 +371,18 @@ public:
     /* Description of CP command on p. 87:
      * "This is basically an A - n  subtraction instruction but the results are thrown  away."
      */
-    func cp_a_a()  -> void { (void)sub8bit(A, A); }
-    func cp_a_b()  -> void { (void)sub8bit(A, B); }
-    func cp_a_c()  -> void { (void)sub8bit(A, C); }
-    func cp_a_d()  -> void { (void)sub8bit(A, D); }
-    func cp_a_e()  -> void { (void)sub8bit(A, E); }
-    func cp_a_h()  -> void { (void)sub8bit(A, H); }
-    func cp_a_l()  -> void { (void)sub8bit(A, L); }
-    func cp_a_hl_ref() -> void { (void)sub8bit(A, read(HL)); }
-    func cp_a_n()  -> void { (void)sub8bit(A, read_pc()); }
+    func cp_a_a()  -> void { (void)sub8bit(A, A); } // 0xBF
+    func cp_a_b()  -> void { (void)sub8bit(A, B); } // 0xB8
+    func cp_a_c()  -> void { (void)sub8bit(A, C); } // 0xB9
+    func cp_a_d()  -> void { (void)sub8bit(A, D); } // 0xBA
+    func cp_a_e()  -> void { (void)sub8bit(A, E); } // 0xBB
+    func cp_a_h()  -> void { (void)sub8bit(A, H); } // 0xBC
+    func cp_a_l()  -> void { (void)sub8bit(A, L); } // 0xBD
+    func cp_a_hl_ref() -> void { (void)sub8bit(A, read(HL)); } // 0xBE
+    func cp_a_n()  -> void { (void)sub8bit(A, read_pc()); } // 0xFE
 
     // INC R
-    func inc_a()  -> void { inc(&A); } // 0x3D
+    func inc_a()  -> void { inc(&A); } // 0x3C
     func inc_b()  -> void { inc(&B); } // 0x04
     func inc_c()  -> void { inc(&C); } // 0x0C
     func inc_d()  -> void { inc(&D); } // 0x14
@@ -442,9 +468,9 @@ public:
     func cpl() -> void { A = ~A; } // 0x2F
     func ccf() -> void { flags.c = ! flags.c; } // 0x3F
     func scf() -> void {F |= 0b001'0000; } // 0x37
-    func nop() -> void { } // 0x00
+    func nop() -> void { printf("NOP");} // 0x00
     func halt() -> void { _halt = true; } // 0x76
-    func stop() -> void { _stop = true; } // 0x10 00
+    func stop() -> void { _stop = true; } // 0x10
     func di() -> void { interruptable = false; } // 0xF3
     func ei() -> void { interruptable = true; } // 0xFB
 
@@ -554,48 +580,238 @@ public:
     func sra_hl_ref() -> void { u8 val = sra(read(HL)); write(HL, val); } // 0xCB 2E
 
     // SRL n
-    func srl_a() -> void { A = srl(A); } // 0xCB 2F
-    func srl_b() -> void { B = srl(B); } // 0xCB 28
-    func srl_c() -> void { C = srl(C); } // 0xCB 29
-    func srl_d() -> void { D = srl(D); } // 0xCB 2A
-    func srl_e() -> void { E = srl(E); } // 0xCB 2B
-    func srl_h() -> void { H = srl(H); } // 0xCB 2C
-    func srl_l() -> void { L = srl(L); } // 0xCB 2D
-    func srl_hl_ref() -> void { u8 val = srl(read(HL)); write(HL, val); } // 0xCB 2E
+    func srl_a() -> void { A = srl(A); } // 0xCB 3F
+    func srl_b() -> void { B = srl(B); } // 0xCB 38
+    func srl_c() -> void { C = srl(C); } // 0xCB 39
+    func srl_d() -> void { D = srl(D); } // 0xCB 3A
+    func srl_e() -> void { E = srl(E); } // 0xCB 3B
+    func srl_h() -> void { H = srl(H); } // 0xCB 3C
+    func srl_l() -> void { L = srl(L); } // 0xCB 3D
+    func srl_hl_ref() -> void { u8 val = srl(read(HL)); write(HL, val); } // 0xCB 3E
 
     /**************************************
      * Section 3.3.7, p. 108: Bit Opcodes *
      **************************************/
 
     // BIT (test bit)
-    func bit_a() -> void { u8 bit_val = read_pc(); bit(bit_val, A); } // 0xCB 47
-    func bit_b() -> void { u8 bit_val = read_pc(); bit(bit_val, B); } // 0xCB 40
-    func bit_c() -> void { u8 bit_val = read_pc(); bit(bit_val, C); } // 0xCB 41
-    func bit_d() -> void { u8 bit_val = read_pc(); bit(bit_val, D); } // 0xCB 42
-    func bit_e() -> void { u8 bit_val = read_pc(); bit(bit_val, E); } // 0xCB 43
-    func bit_h() -> void { u8 bit_val = read_pc(); bit(bit_val, H); } // 0xCB 44
-    func bit_l() -> void { u8 bit_val = read_pc(); bit(bit_val, L); } // 0xCB 45
-    func bit_hl_ref() -> void { u8 bit_val = read_pc(); bit(bit_val, read(HL)); } // 0xCB 46
+    func bit_a_0() -> void {bit(0, A); } // 0xCB 47
+    func bit_b_0() -> void {bit(0, B); } // 0xCB 40
+    func bit_c_0() -> void {bit(0, C); } // 0xCB 41
+    func bit_d_0() -> void {bit(0, D); } // 0xCB 42
+    func bit_e_0() -> void {bit(0, E); } // 0xCB 43
+    func bit_h_0() -> void {bit(0, H); } // 0xCB 44
+    func bit_l_0() -> void {bit(0, L); } // 0xCB 45
+    func bit_hl_ref_0() -> void {bit(0, read(HL)); } // 0xCB 46
+
+    func bit_a_1() -> void {bit(1, A); } // 0xCB 4F
+    func bit_b_1() -> void {bit(1, B); } // 0xCB 48
+    func bit_c_1() -> void {bit(1, C); } // 0xCB 49
+    func bit_d_1() -> void {bit(1, D); } // 0xCB 4A
+    func bit_e_1() -> void {bit(1, E); } // 0xCB 4B
+    func bit_h_1() -> void {bit(1, H); } // 0xCB 4C
+    func bit_l_1() -> void {bit(1, L); } // 0xCB 4D
+    func bit_hl_ref_1() -> void {bit(1, read(HL)); } // 0xCB 4E
+
+    func bit_a_2() -> void {bit(2, A); } // 0xCB 57
+    func bit_b_2() -> void {bit(2, B); } // 0xCB 50
+    func bit_c_2() -> void {bit(2, C); } // 0xCB 51
+    func bit_d_2() -> void {bit(2, D); } // 0xCB 52
+    func bit_e_2() -> void {bit(2, E); } // 0xCB 53
+    func bit_h_2() -> void {bit(2, H); } // 0xCB 54
+    func bit_l_2() -> void {bit(2, L); } // 0xCB 55
+    func bit_hl_ref_2() -> void {bit(2, read(HL)); } // 0xCB 56
+
+    func bit_a_3() -> void {bit(3, A); } // 0xCB 5F
+    func bit_b_3() -> void {bit(3, B); } // 0xCB 58
+    func bit_c_3() -> void {bit(3, C); } // 0xCB 59
+    func bit_d_3() -> void {bit(3, D); } // 0xCB 5A
+    func bit_e_3() -> void {bit(3, E); } // 0xCB 5B
+    func bit_h_3() -> void {bit(3, H); } // 0xCB 5C
+    func bit_l_3() -> void {bit(3, L); } // 0xCB 5D
+    func bit_hl_ref_3() -> void {bit(3, read(HL)); } // 0xCB 5E
+    
+    func bit_a_4() -> void {bit(4, A); } // 0xCB 67
+    func bit_b_4() -> void {bit(4, B); } // 0xCB 60
+    func bit_c_4() -> void {bit(4, C); } // 0xCB 61
+    func bit_d_4() -> void {bit(4, D); } // 0xCB 62
+    func bit_e_4() -> void {bit(4, E); } // 0xCB 63
+    func bit_h_4() -> void {bit(4, H); } // 0xCB 64
+    func bit_l_4() -> void {bit(4, L); } // 0xCB 65
+    func bit_hl_ref_4() -> void {bit(4, read(HL)); } // 0xCB 66
+
+    func bit_a_5() -> void {bit(5, A); } // 0xCB 6F
+    func bit_b_5() -> void {bit(5, B); } // 0xCB 68
+    func bit_c_5() -> void {bit(5, C); } // 0xCB 69
+    func bit_d_5() -> void {bit(5, D); } // 0xCB 6A
+    func bit_e_5() -> void {bit(5, E); } // 0xCB 6B
+    func bit_h_5() -> void {bit(5, H); } // 0xCB 6C
+    func bit_l_5() -> void {bit(5, L); } // 0xCB 6D
+    func bit_hl_ref_5() -> void {bit(5, read(HL)); } // 0xCB 6E
+    
+    func bit_a_6() -> void {bit(6, A); } // 0xCB 77
+    func bit_b_6() -> void {bit(6, B); } // 0xCB 70
+    func bit_c_6() -> void {bit(6, C); } // 0xCB 71
+    func bit_d_6() -> void {bit(6, D); } // 0xCB 72
+    func bit_e_6() -> void {bit(6, E); } // 0xCB 73
+    func bit_h_6() -> void {bit(6, H); } // 0xCB 74
+    func bit_l_6() -> void {bit(6, L); } // 0xCB 75
+    func bit_hl_ref_6() -> void {bit(6, read(HL)); } // 0xCB 76
+
+    func bit_a_7() -> void {bit(7, A); } // 0xCB 7F
+    func bit_b_7() -> void {bit(7, B); } // 0xCB 78
+    func bit_c_7() -> void {bit(7, C); } // 0xCB 79
+    func bit_d_7() -> void {bit(7, D); } // 0xCB 7A
+    func bit_e_7() -> void {bit(7, E); } // 0xCB 7B
+    func bit_h_7() -> void {bit(7, H); } // 0xCB 7C
+    func bit_l_7() -> void {bit(7, L); } // 0xCB 7D
+    func bit_hl_ref_7() -> void {bit(7, read(HL)); } // 0xCB 7E
+    
+    // RES (reset bit)
+    func res_a_0() -> void {A = res(0, A); } // 0xCB 87
+    func res_b_0() -> void {B = res(0, B); } // 0xCB 80
+    func res_c_0() -> void {C = res(0, C); } // 0xCB 81
+    func res_d_0() -> void {D = res(0, D); } // 0xCB 82
+    func res_e_0() -> void {E = res(0, E); } // 0xCB 83
+    func res_h_0() -> void {H = res(0, H); } // 0xCB 84
+    func res_l_0() -> void {L = res(0, L); } // 0xCB 85
+    func res_hl_ref_0() -> void {u8 val = res(0, read(HL)); write(HL, val); } // 0xCB 86
+
+    func res_a_1() -> void {A = res(1, A); } // 0xCB 8F
+    func res_b_1() -> void {B = res(1, B); } // 0xCB 88
+    func res_c_1() -> void {C = res(1, C); } // 0xCB 89
+    func res_d_1() -> void {D = res(1, D); } // 0xCB 8A
+    func res_e_1() -> void {E = res(1, E); } // 0xCB 8B
+    func res_h_1() -> void {H = res(1, H); } // 0xCB 8C
+    func res_l_1() -> void {L = res(1, L); } // 0xCB 8D
+    func res_hl_ref_1() -> void {u8 val = res(1, read(HL)); write(HL, val); } // 0xCB 8E
+
+    func res_a_2() -> void {A = res(2, A); } // 0xCB 97
+    func res_b_2() -> void {B = res(2, B); } // 0xCB 90
+    func res_c_2() -> void {C = res(2, C); } // 0xCB 91
+    func res_d_2() -> void {D = res(2, D); } // 0xCB 92
+    func res_e_2() -> void {E = res(2, E); } // 0xCB 93
+    func res_h_2() -> void {H = res(2, H); } // 0xCB 94
+    func res_l_2() -> void {L = res(2, L); } // 0xCB 95
+    func res_hl_ref_2() -> void {u8 val = res(2, read(HL)); write(HL, val); } // 0xCB 96
+
+    func res_a_3() -> void {A = res(3, A); } // 0xCB 9F
+    func res_b_3() -> void {B = res(3, B); } // 0xCB 98
+    func res_c_3() -> void {C = res(3, C); } // 0xCB 99
+    func res_d_3() -> void {D = res(3, D); } // 0xCB 9A
+    func res_e_3() -> void {E = res(3, E); } // 0xCB 9B
+    func res_h_3() -> void {H = res(3, H); } // 0xCB 9C
+    func res_l_3() -> void {L = res(3, L); } // 0xCB 9D
+    func res_hl_ref_3() -> void {u8 val = res(3, read(HL)); write(HL, val); } // 0xCB 9E
+
+    func res_a_4() -> void {A = res(4, A); } // 0xCB A7
+    func res_b_4() -> void {B = res(4, B); } // 0xCB A0
+    func res_c_4() -> void {C = res(4, C); } // 0xCB A1
+    func res_d_4() -> void {D = res(4, D); } // 0xCB A2
+    func res_e_4() -> void {E = res(4, E); } // 0xCB A3
+    func res_h_4() -> void {H = res(4, H); } // 0xCB A4
+    func res_l_4() -> void {L = res(4, L); } // 0xCB A5
+    func res_hl_ref_4() -> void {u8 val = res(4, read(HL)); write(HL, val); } // 0xCB A6
+
+    func res_a_5() -> void {A = res(5, A); } // 0xCB AF
+    func res_b_5() -> void {B = res(5, B); } // 0xCB A8
+    func res_c_5() -> void {C = res(5, C); } // 0xCB A9
+    func res_d_5() -> void {D = res(5, D); } // 0xCB AA
+    func res_e_5() -> void {E = res(5, E); } // 0xCB AB
+    func res_h_5() -> void {H = res(5, H); } // 0xCB AC
+    func res_l_5() -> void {L = res(5, L); } // 0xCB AD
+    func res_hl_ref_5() -> void {u8 val = res(5, read(HL)); write(HL, val); } // 0xCB AE
+
+    func res_a_6() -> void {A = res(6, A); } // 0xCB B7
+    func res_b_6() -> void {B = res(6, B); } // 0xCB B0
+    func res_c_6() -> void {C = res(6, C); } // 0xCB B1
+    func res_d_6() -> void {D = res(6, D); } // 0xCB B2
+    func res_e_6() -> void {E = res(6, E); } // 0xCB B3
+    func res_h_6() -> void {H = res(6, H); } // 0xCB B4
+    func res_l_6() -> void {L = res(6, L); } // 0xCB B5
+    func res_hl_ref_6() -> void {u8 val = res(6, read(HL));  write(HL, val);} // 0xCB B6
+
+    func res_a_7() -> void {A = res(7, A); } // 0xCB BF
+    func res_b_7() -> void {B = res(7, B); } // 0xCB B8
+    func res_c_7() -> void {C = res(7, C); } // 0xCB B9
+    func res_d_7() -> void {D = res(7, D); } // 0xCB BA
+    func res_e_7() -> void {E = res(7, E); } // 0xCB BB
+    func res_h_7() -> void {H = res(7, H); } // 0xCB BC
+    func res_l_7() -> void {L = res(7, L); } // 0xCB BD
+    func res_hl_ref_7() -> void {u8 val = res(7, read(HL)); write(HL, val); } // 0xCB BE
 
     // SET (set bit)
-    func set_a() -> void { u8 bit_val = read_pc(); A = set(bit_val, A); } // 0xCB C7
-    func set_b() -> void { u8 bit_val = read_pc(); B = set(bit_val, B); } // 0xCB C0
-    func set_c() -> void { u8 bit_val = read_pc(); C = set(bit_val, C); } // 0xCB C1
-    func set_d() -> void { u8 bit_val = read_pc(); D = set(bit_val, D); } // 0xCB C2
-    func set_e() -> void { u8 bit_val = read_pc(); E = set(bit_val, E); } // 0xCB C3
-    func set_h() -> void { u8 bit_val = read_pc(); H = set(bit_val, H); } // 0xCB C4
-    func set_l() -> void { u8 bit_val = read_pc(); L = set(bit_val, L); } // 0xCB C5
-    func set_hl_ref() -> void { u8 bit_val = read_pc(); u8 val = set(bit_val, read(HL)); write(HL, val); } // 0xCB C6
+    func set_a_0() -> void {A = set(0, A); } // 0xCB C7
+    func set_b_0() -> void {B = set(0, B); } // 0xCB C0
+    func set_c_0() -> void {C = set(0, C); } // 0xCB C1
+    func set_d_0() -> void {D = set(0, D); } // 0xCB C2
+    func set_e_0() -> void {E = set(0, E); } // 0xCB C3
+    func set_h_0() -> void {H = set(0, H); } // 0xCB C4
+    func set_l_0() -> void {L = set(0, L); } // 0xCB C5
+    func set_hl_ref_0() -> void {u8 val = set(0, read(HL)); write(HL, val); } // 0xCB C6
 
-    // RES (reset bit)
-    func res_a() -> void { u8 bit_val = read_pc(); A = res(bit_val, A); } // 0xCB 87
-    func res_b() -> void { u8 bit_val = read_pc(); B = res(bit_val, B); } // 0xCB 80
-    func res_c() -> void { u8 bit_val = read_pc(); C = res(bit_val, C); } // 0xCB 81
-    func res_d() -> void { u8 bit_val = read_pc(); D = res(bit_val, D); } // 0xCB 82
-    func res_e() -> void { u8 bit_val = read_pc(); E = res(bit_val, E); } // 0xCB 83
-    func res_h() -> void { u8 bit_val = read_pc(); H = res(bit_val, H); } // 0xCB 84
-    func res_l() -> void { u8 bit_val = read_pc(); L = res(bit_val, L); } // 0xCB 85
-    func res_hl_ref() -> void { u8 bit_val = read_pc(); u8 val = res(bit_val, read(HL)); write(HL, val); } // 0xCB 86
+    func set_a_1() -> void {A = set(1, A); } // 0xCB CF
+    func set_b_1() -> void {B = set(1, B); } // 0xCB C8
+    func set_c_1() -> void {C = set(1, C); } // 0xCB C9
+    func set_d_1() -> void {D = set(1, D); } // 0xCB CA
+    func set_e_1() -> void {E = set(1, E); } // 0xCB CB
+    func set_h_1() -> void {H = set(1, H); } // 0xCB CC
+    func set_l_1() -> void {L = set(1, L); } // 0xCB CD
+    func set_hl_ref_1() -> void {u8 val = set(1, read(HL)); write(HL, val); } // 0xCB CE
+
+    func set_a_2() -> void {A = set(2, A); } // 0xCB D7
+    func set_b_2() -> void {B = set(2, B); } // 0xCB D0
+    func set_c_2() -> void {C = set(2, C); } // 0xCB D1
+    func set_d_2() -> void {D = set(2, D); } // 0xCB D2
+    func set_e_2() -> void {E = set(2, E); } // 0xCB D3
+    func set_h_2() -> void {H = set(2, H); } // 0xCB D4
+    func set_l_2() -> void {L = set(2, L); } // 0xCB D5
+    func set_hl_ref_2() -> void {u8 val = set(2, read(HL)); write(HL, val); } // 0xCB D6
+
+    func set_a_3() -> void {A = set(3, A); } // 0xCB DF
+    func set_b_3() -> void {B = set(3, B); } // 0xCB D8
+    func set_c_3() -> void {C = set(3, C); } // 0xCB D9
+    func set_d_3() -> void {D = set(3, D); } // 0xCB DA
+    func set_e_3() -> void {E = set(3, E); } // 0xCB DB
+    func set_h_3() -> void {H = set(3, H); } // 0xCB DC
+    func set_l_3() -> void {L = set(3, L); } // 0xCB DD
+    func set_hl_ref_3() -> void {u8 val = set(3, read(HL)); write(HL, val); } // 0xCB DE
+
+    func set_a_4() -> void {A = set(4, A); } // 0xCB E7
+    func set_b_4() -> void {B = set(4, B); } // 0xCB E0
+    func set_c_4() -> void {C = set(4, C); } // 0xCB E1
+    func set_d_4() -> void {D = set(4, D); } // 0xCB E2
+    func set_e_4() -> void {E = set(4, E); } // 0xCB E3
+    func set_h_4() -> void {H = set(4, H); } // 0xCB E4
+    func set_l_4() -> void {L = set(4, L); } // 0xCB E5
+    func set_hl_ref_4() -> void {u8 val = set(4, read(HL)); write(HL, val); } // 0xCB E6
+
+    func set_a_5() -> void {A = set(5, A); } // 0xCB EF
+    func set_b_5() -> void {B = set(5, B); } // 0xCB E8
+    func set_c_5() -> void {C = set(5, C); } // 0xCB E9
+    func set_d_5() -> void {D = set(5, D); } // 0xCB EA
+    func set_e_5() -> void {E = set(5, E); } // 0xCB EB
+    func set_h_5() -> void {H = set(5, H); } // 0xCB EC
+    func set_l_5() -> void {L = set(5, L); } // 0xCB ED
+    func set_hl_ref_5() -> void {u8 val = set(5, read(HL)); write(HL, val); } // 0xCB EE
+
+    func set_a_6() -> void {A = set(6, A); } // 0xCB F7
+    func set_b_6() -> void {B = set(6, B); } // 0xCB F0
+    func set_c_6() -> void {C = set(6, C); } // 0xCB F1
+    func set_d_6() -> void {D = set(6, D); } // 0xCB F2
+    func set_e_6() -> void {E = set(6, E); } // 0xCB F3
+    func set_h_6() -> void {H = set(6, H); } // 0xCB F4
+    func set_l_6() -> void {L = set(6, L); } // 0xCB F5
+    func set_hl_ref_6() -> void {u8 val = set(6, read(HL)); write(HL, val); } // 0xCB F6
+
+    func set_a_7() -> void {A = set(7, A); } // 0xCB FF
+    func set_b_7() -> void {B = set(7, B); } // 0xCB F8
+    func set_c_7() -> void {C = set(7, C); } // 0xCB F9
+    func set_d_7() -> void {D = set(7, D); } // 0xCB FA
+    func set_e_7() -> void {E = set(7, E); } // 0xCB FB
+    func set_h_7() -> void {H = set(7, H); } // 0xCB FC
+    func set_l_7() -> void {L = set(7, L); } // 0xCB FD
+    func set_hl_ref_7() -> void {u8 val = set(7, read(HL)); write(HL, val); } // 0xCB FE
+    
 
     /********************************
      * Section 3.3.8, p. 108: Jumps *
@@ -604,26 +820,26 @@ public:
     func jp_nn() -> void { PC = read16_pc(); } // 0xC3
 
     // JP cc,nn
-    func jp_nz_nn() -> void { if(!flags.z) jp_nn(); } // 0xC2
-    func jp_z_nn() -> void { if(flags.z) jp_nn(); }   // 0xCA
-    func jp_nc_nn() -> void { if(!flags.c) jp_nn(); } // 0xD2
-    func jp_c_nn() -> void { if(flags.c) jp_nn(); }   // 0xDA
+    func jp_nz_nn() -> void { if(!flags.z) jp_nn(); else { PC+=2; } } // 0xC2
+    func jp_z_nn() -> void { if(flags.z) jp_nn();else PC+=2;}   // 0xCA
+    func jp_nc_nn() -> void { if(!flags.c) jp_nn();else PC+=2;} // 0xD2
+    func jp_c_nn() -> void { if(flags.c) jp_nn(); else PC+=2;}   // 0xDA
 
     func jp_hl() -> void { PC = HL; } // 0xE9
 
     func jr_n() -> void { PC += (i8)read_pc(); } // 0x18 // TODO: PC gets incremented here because of reading. Maybe decrement is needed
 
     // JR CC,n
-    func jr_nz_n() -> void {  if(!flags.z) jr_n(); } // 0x20
-    func jr_z_n() -> void {  if(flags.z) jr_n() ; }   // 0x28
-    func jr_nc_n() -> void {  if(!flags.c) jr_n(); } // 0x30
-    func jr_c_n() -> void {  if(flags.c) jr_n(); }   // 0x38
+    func jr_nz_n() -> void {  if(!flags.z) jr_n();else PC+=1;} // 0x20
+    func jr_z_n() -> void {  if(flags.z) jr_n() ;else PC+=1;}   // 0x28
+    func jr_nc_n() -> void {  if(!flags.c) jr_n();else PC+=1;} // 0x30
+    func jr_c_n() -> void {  if(flags.c) jr_n();else PC+=1;}   // 0x38
 
     /********************************
      * Section 3.3.9, p. 108: Calls *
      ********************************/
 
-    func call_nn() -> void { push16(PC + 1); jp_nn(); } // 0xCD
+    func call_nn() -> void { push16(PC + 2); jp_nn(); } // 0xCD
 
     // CALL cc,nn
     func call_nz_nn() -> void { if(!flags.z) call_nn();  } // 0xC4
@@ -661,7 +877,7 @@ public:
 private:
     bool _stop = false;
     bool _halt = false;
-    bool interruptable = true;
+    bool interruptable = false;
 
     /************************************************
      * Helper Functions for Read/Write Instructions *
@@ -669,7 +885,8 @@ private:
 
     // Read Program Counter, 8-bit
     [[nodiscard]] inline func read_pc() -> u8 {
-        u8 val =  *(mem->mem+PC);
+        u8 val =  mem->read(PC);
+    //    printf(" %x", val);
         PC++;
         return val;
     }
@@ -684,7 +901,7 @@ private:
     // Read Stack, 8-bit
     [[nodiscard]] inline func pop() -> u8 {
         SP++;
-        return *(mem->mem+SP);
+        return mem->read(SP);
     }
 
     // Read Stack, 16-bit
@@ -696,7 +913,7 @@ private:
 
     // Write Stack, 8-bit
     inline func push(u8 val) -> void {
-        *(mem->mem+SP) = val;
+        mem->write(SP, val);
         SP--;
     }
 
@@ -708,18 +925,18 @@ private:
 
     // Read from arbitrary address, 8-bit
     inline func read(u16 addr) -> u8 {
-        return (*(mem->mem)+addr);
+        return mem->read(addr);
     }
 
     // Write to arbitrary address, 8-bit
-    inline func write(i16 addr, u8 val) -> void {
-        *(mem->mem+addr) = val;
+    inline func write(u16 addr, u8 val) -> void {
+        mem->write(addr, val);
     }
 
     // Write to arbitrary address, 16-bit
     inline func write16(u16 addr, u16 val) -> void {
-        *(mem->mem+addr)   = (val & 0xFF);
-        *(mem->mem+addr+1) = (val >> 8);
+        mem->write(addr, val & 0xFF);
+        mem->write(addr + 1, val >> 8);
 
     }
 
@@ -801,10 +1018,10 @@ private:
     }
 
     inline func inc(u8* addr) -> void {
-        flags.z = 0xFF == *addr;
         flags.n = false;
         flags.h = 0x0F == (*addr & 0x0F);
         (*addr)++;
+        flags.z = 0 == *addr;
     }
 
     inline func dec(u8* addr) -> void {
@@ -922,7 +1139,7 @@ private:
      *****************************************/
 
     func bit(u8 bit, u8 reg) -> void {
-        flags.z = reg & (0x01 << bit);
+        flags.z = !(reg & (0x01 << bit));
         flags.n = false;
         flags.h = true;
     }

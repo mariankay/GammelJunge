@@ -3,4 +3,4 @@ project(GammelJunge)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(GammelJunge main.cpp src/common.h src/cpu.hpp src/memory.hpp)
+add_executable(GammelJunge main.cpp src/common.h src/cpu.hpp src/memory.hpp src/cartridge.hpp src/opcode_mapping.hpp)
